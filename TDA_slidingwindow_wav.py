@@ -19,7 +19,7 @@ from IPython.display import Audio
 
 
 #load in song and display it as waveform
-Fs, X = scipy.io.wavfile.read('journey.wav')
+Fs, X = scipy.io.wavfile.read('/Users/nathanl/Desktop/01.wav')
 X = X/(2.0**15) #in as 16 bit shorts, convert to float
 plt.figure()
 plt.plot(np.arange(len(X))/float(Fs), X)
@@ -27,7 +27,7 @@ plt.xlabel("Time (secs)")
 plt.title("Song Name")
 plt.show()
 
-#Audio('songname.wav')
+Audio('/Users/nathanl/Desktop/01.wav')
 
 
 #sliding window, assuming integer x, dim, Tau
@@ -65,6 +65,64 @@ Z = pca.fit_transform(Y)
 
 #plot point cloud and persistence diagram for song
 plt.figure(figsize=(8, 4))
+plt.subplot(121)
+plt.title("2D PCA")
+plt.scatter(Z[:, 0], Z[:, 1])
+plt.subplot(122)
+plot_diagrams(PDs)
+plt.title("Persistence Diagram")
+plt.show()
+
+
+
+from MusicFeatures import *
+
+#Compute the power spectrogram and audio novelty function
+winSize = 512
+hopSize = 256
+plt.figure()
+(S, novFn) = getAudioNoveltyFn(X, Fs, winSize, hopSize)
+plt.imshow(np.log(S.T), cmap = 'afmhot', aspect = 'auto')
+plt.title('Log-frequency power spectrogram')
+plt.show()
+
+plt.figure(figsize=(8, 4))
+#Plot the spectrogram again
+plt.subplot(211)
+plt.imshow(np.log(S.T), cmap = 'afmhot', aspect = 'auto')
+plt.ylabel('Frequency Bin')
+plt.title('Log-frequency power spectrogram')
+
+#Plot the audio novelty function
+plt.subplot(212)
+plt.plot(np.arange(len(novFn))*hopSize/float(Fs), novFn)
+plt.xlabel("Time (Seconds)")
+plt.ylabel('Audio Novelty')
+plt.xlim([0, len(novFn)*float(hopSize)/Fs])
+plt.show()
+
+(S, novFn) = getAudioNoveltyFn(X, Fs, winSize, hopSize)
+
+#Take the first 3 seconds of the novelty function
+fac = int(Fs/hopSize)
+novFn = novFn[fac*4:fac*7]
+
+#Make sure the window size is half of a second, noting that
+#the audio novelty function has been downsampled by a "hopSize" factor
+dim = 20
+Tau = (Fs/2)/(float(hopSize)*dim)
+dT = 1
+Y = getSlidingWindowInteger(novFn, dim, Tau, dT)
+print("Y.shape = ", Y.shape)
+#Mean-center and normalize
+Y = Y - np.mean(Y, 1)[:, None]
+Y = Y/np.sqrt(np.sum(Y**2, 1))[:, None]
+
+PDs = ripser(Y, maxdim=1)['dgms']
+pca = PCA()
+Z = pca.fit_transform(Y)
+
+plt.figure(figsize=(12, 6))
 plt.subplot(121)
 plt.title("2D PCA")
 plt.scatter(Z[:, 0], Z[:, 1])
