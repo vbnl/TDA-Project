@@ -17,18 +17,17 @@ import scipy.io.wavfile
 from IPython.display import clear_output
 from IPython.display import Audio
 
-
-#load in song and display it as waveform
-Fs, X = scipy.io.wavfile.read('journey.wav')
-X = X/(2.0**15) #in as 16 bit shorts, convert to float
-plt.figure()
-plt.plot(np.arange(len(X))/float(Fs), X)
-plt.xlabel("Time (secs)")
-plt.title("Song Name")
-plt.show()
-
-#Audio('songname.wav')
-
+def get_waveform(file_name, should_plot = False):
+    #load in song and display it as waveform
+    Fs, X = scipy.io.wavfile.read(file_name)
+    X = X/(2.0**15) #in as 16 bit shorts, convert to float
+    if(should_plot) :
+        plt.figure()
+        plt.plot(np.arange(len(X))/float(Fs), X)
+        plt.xlabel("Time (secs)")
+        plt.title("Song Name")
+        plt.show()
+    return Fs, X
 
 #sliding window, assuming integer x, dim, Tau
 def slidingWindowInt(x, dim, Tau, dT):
@@ -42,36 +41,46 @@ def slidingWindowInt(x, dim, Tau, dT):
     for i in range(numWindows):
         #indices of the samples in window
         idxx = np.array(dT*i + Tau*np.arange(dim), dtype=np.int32)
-        X[i, :] = x[idxx]
+        X[i, :] = x[idxx][:,0]
     return X
 
 
+def compute_pd(Fs, X, dim, Tau, dT):
+    Y = slidingWindowInt(X[0:Fs*3], dim, Tau, dT)
+
+    print("Y.shape = ", Y.shape)
+    #Mean-center and normalize
+    Y = Y - np.mean(Y, 1)[:, None]
+    Y = Y/np.sqrt(np.sum(Y**2, 1))[:, None]
+
+    PDs = ripser(Y, maxdim=1)['dgms']
+    pca = PCA()
+    Z = pca.fit_transform(Y)
+
+    #plot point cloud and persistence diagram for song
+    plt.figure(figsize=(8, 4))
+    plt.subplot(121)
+    plt.title("2D PCA")
+    plt.scatter(Z[:, 0], Z[:, 1])
+    plt.subplot(122)
+    plot_diagrams(PDs)
+    plt.title("Persistence Diagram, dim = "+str(dim)+" tau = "+str(Tau) + "dT" + str(dT))
+    plt.show()
+    
+Fs, X = get_waveform("01 Chromatica I.wav")
 
 #dim*Tau here spans 1/2 second since Fs is the sample rate
+''' Original settings 
 dim = round(Fs/200)
 Tau = 100
-dT = Fs/100
+dT = Fs/100     
+'''
 
-Y = slidingWindowInt(X[0:Fs*3], dim, Tau, dT)
+#dim = round(Fs/200)
+dT = Fs/100     
+tau_vals = [10,25,50,100,250,500]
 
-print("Y.shape = ", Y.shape)
-#Mean-center and normalize
-Y = Y - np.mean(Y, 1)[:, None]
-Y = Y/np.sqrt(np.sum(Y**2, 1))[:, None]
 
-PDs = ripser(Y, maxdim=1)['dgms']
-pca = PCA()
-Z = pca.fit_transform(Y)
-
-#plot point cloud and persistence diagram for song
-plt.figure(figsize=(8, 4))
-plt.subplot(121)
-plt.title("2D PCA")
-plt.scatter(Z[:, 0], Z[:, 1])
-plt.subplot(122)
-plot_diagrams(PDs)
-plt.title("Persistence Diagram")
-plt.show()
-    
-
-    
+for tau in tau_vals:
+    dim = round(Fs/(2*tau))
+    compute_pd(Fs, X, dim, tau, dT)
