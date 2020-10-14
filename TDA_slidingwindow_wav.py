@@ -19,7 +19,7 @@ from IPython.display import Audio
 
 
 #load in song and display it as waveform
-Fs, X = scipy.io.wavfile.read('songname.wav')
+Fs, X = scipy.io.wavfile.read('journey.wav')
 X = X/(2.0**15) #in as 16 bit shorts, convert to float
 plt.figure()
 plt.plot(np.arange(len(X))/float(Fs), X)
@@ -27,7 +27,7 @@ plt.xlabel("Time (secs)")
 plt.title("Song Name")
 plt.show()
 
-Audio('songname.wav')
+#Audio('songname.wav')
 
 
 #sliding window, assuming integer x, dim, Tau
