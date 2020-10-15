@@ -43,22 +43,49 @@ def slidingWindowInt(x, dim, Tau, dT, duration = 3):
         #indices of the samples in window
         idxx = np.array(dT*i + Tau*np.arange(dim), dtype=np.int32)
         # This changes based on whether you have mono or stereo audio
-        X[i, :] = x[idxx][:,0]
+        X[i, :] = x[idxx]
         #X[i, :] = x[idxx]
     return X
 
-def compute_pd(Fs, X, dim, Tau, dT):
-    # This version only looks at the first 3 seconds
-    #Y = slidingWindowInt(X[0:Fs*3], dim, Tau, dT)
-    Y = slidingWindowInt(X[0:Fs*3], dim, Tau, dT)
+
+def compute_novfn(X,winSize, hopSize, plot_spectrogram = False, plot_novfn = False):
     
-    print("Y.shape = ", Y.shape)
+    #Compute the power spectrogram and audio novelty function
+    (S, novFn) = getAudioNoveltyFn(X[:,0], Fs, winSize, hopSize)
+        
+    if plot_spectrogram:    
+        plt.figure()
+        plt.imshow(np.log(S.T), cmap = 'afmhot', aspect = 'auto')
+        plt.title('Log-frequency power spectrogram')
+        plt.show() 
+
+    if plot_novfn:              
+        plt.figure(figsize=(8, 4))
+        #Plot the spectrogram again
+        plt.subplot(211)
+        plt.imshow(np.log(S.T), cmap = 'afmhot', aspect = 'auto')
+        plt.ylabel('Frequency Bin')
+        plt.title('Log-frequency power spectrogram')
+
+        #Plot the audio novelty function
+        plt.subplot(212)
+        plt.plot(np.arange(len(novFn))*hopSize/float(Fs), novFn)
+        plt.xlabel("Time (Seconds)")
+        plt.ylabel('Audio Novelty')
+        plt.xlim([0, len(novFn)*float(hopSize)/Fs])
+        plt.show()
+
+    return S,novFn
+
+def compute_pd(Y):
     #Mean-center and normalize
     Y = Y - np.mean(Y, 1)[:, None]
     Y = Y/np.sqrt(np.sum(Y**2, 1))[:, None]
     PDs = ripser(Y, maxdim=1)['dgms']
     pca = PCA()
     Z = pca.fit_transform(Y)
+
+    #print(pca.explained_variance_ratio_)
 
     #plot point cloud and persistence diagram for song
     plt.figure(figsize=(8, 4))
@@ -70,60 +97,7 @@ def compute_pd(Fs, X, dim, Tau, dT):
     plt.title("Persistence Diagram, dim = "+str(dim)+" tau = "+str(Tau) + "dT" + str(dT))
     plt.show()
 
-    #Compute the power spectrogram and audio novelty function
-    winSize = 512
-    hopSize = 256
-    plt.figure()
-    (S, novFn) = getAudioNoveltyFn(X[:,0], Fs, winSize, hopSize)
-    plt.imshow(np.log(S.T), cmap = 'afmhot', aspect = 'auto')
-    plt.title('Log-frequency power spectrogram')
-    plt.show()
-
-    plt.figure(figsize=(8, 4))
-    #Plot the spectrogram again
-    plt.subplot(211)
-    plt.imshow(np.log(S.T), cmap = 'afmhot', aspect = 'auto')
-    plt.ylabel('Frequency Bin')
-    plt.title('Log-frequency power spectrogram')
-
-    #Plot the audio novelty function
-    plt.subplot(212)
-    plt.plot(np.arange(len(novFn))*hopSize/float(Fs), novFn)
-    plt.xlabel("Time (Seconds)")
-    plt.ylabel('Audio Novelty')
-    plt.xlim([0, len(novFn)*float(hopSize)/Fs])
-    plt.show()
-
-    (S, novFn) = getAudioNoveltyFn(X, Fs, winSize, hopSize)
-
-    #Take the first 3 seconds of the novelty function
-    fac = int(Fs/hopSize)
-    novFn = novFn[fac*4:fac*7]
-
-    #Make sure the window size is half of a second, noting that
-    #the audio novelty function has been downsampled by a "hopSize" factor
-    dim = 20
-    Tau = (Fs/2)/(float(hopSize)*dim)
-    dT = 1
-    Y = getSlidingWindowInteger(novFn, dim, Tau, dT)
-    print("Y.shape = ", Y.shape)
-    #Mean-center and normalize
-    Y = Y - np.mean(Y, 1)[:, None]
-    Y = Y/np.sqrt(np.sum(Y**2, 1))[:, None]
-
-    PDs = ripser(Y, maxdim=1)['dgms']
-    pca = PCA()
-    Z = pca.fit_transform(Y)
-
-    plt.figure(figsize=(12, 6))
-    plt.subplot(121)
-    plt.title("2D PCA")
-    plt.scatter(Z[:, 0], Z[:, 1])
-    plt.subplot(122)
-    plot_diagrams(PDs)
-    plt.title("Persistence Diagram")
-    plt.show()
-
+    
 Fs, X = get_waveform("01 Chromatica I.wav")
 
 #dim*Tau here spans 1/2 second since Fs is the sample rate
@@ -133,6 +107,7 @@ Tau = 100
 dT = Fs/100     
 '''
 
+'''
 #dim = round(Fs/200)
 dT = Fs/100     
 tau_vals = [100]
@@ -141,3 +116,36 @@ tau_vals = [100]
 for tau in tau_vals:
     dim = round(Fs/(2*tau))
     compute_pd(Fs, X, dim, tau, dT)
+'''
+
+winSize = 512
+hopSize = 256
+
+S, novFn = compute_novfn(X,winSize, hopSize)
+    
+#Take the first 3 seconds of the novelty function
+fac = int(Fs/hopSize)
+novFn = novFn[fac*4:fac*20]
+# Chromatica I is at tempo of 66
+# So window size should be about a second
+
+#Make sure the window size is half of a second, noting that
+#the audio novelty function has been downsampled by a "hopSize" factor
+dim = 20
+# Need Fs instead of Fs/2 because of the tempo thing - can implement a more general thing here later
+Tau = (Fs)/(float(hopSize)*dim)
+dT = 2
+
+Y = slidingWindowInt(novFn, dim, Tau, dT)
+print("Y.shape = ", Y.shape)
+
+dim_arr = [5,10,20,50,100]
+dt_arr = [2,5, 10]
+for dim in dim_arr:     
+    for dT in dt_arr: 
+        Tau = (Fs)/(float(hopSize)*dim)
+
+        Y = slidingWindowInt(novFn, dim, Tau, dT)
+        print("Y.shape = ", Y.shape)
+        print("dim: "+str(dim)+" dT: "+str(dT))
+        compute_pd(Y)
