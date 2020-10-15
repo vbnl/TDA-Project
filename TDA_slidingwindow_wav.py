@@ -17,6 +17,7 @@ import scipy.io.wavfile
 from IPython.display import clear_output
 from IPython.display import Audio
 from MusicFeatures import *
+import librosa
 
 def get_waveform(file_name, should_plot = False):
     #load in song and display it as waveform
@@ -134,12 +135,13 @@ novFn = novFn[fac*4:fac*20]
 dim = 20
 # Need Fs instead of Fs/2 because of the tempo thing - can implement a more general thing here later
 Tau = (Fs)/(float(hopSize)*dim)
-dT = 2
+dT = 1
 
 Y = slidingWindowInt(novFn, dim, Tau, dT)
 print("Y.shape = ", Y.shape)
 
-dim_arr = [5,10,20,50,100]
+'''
+dim_arr = [5]
 dt_arr = [2,5, 10]
 for dim in dim_arr:     
     for dT in dt_arr: 
@@ -149,3 +151,15 @@ for dim in dim_arr:
         print("Y.shape = ", Y.shape)
         print("dim: "+str(dim)+" dT: "+str(dT))
         compute_pd(Y)
+'''
+print("Sample rate"+str(Fs))
+chroma = librosa.feature.chroma_stft(X[:,0], Fs)
+print("Chroma shape: "+str(chroma.shape))
+dim = 5
+Tau = 1
+dT = 3
+Y_chroma = slidingWindowInt(chroma[3,0:200].transpose(), dim, Tau, dT)
+print("Y_chroma.shape= ", Y_chroma.shape)
+compute_pd(Y_chroma)
+
+
