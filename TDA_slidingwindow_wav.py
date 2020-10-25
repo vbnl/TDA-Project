@@ -61,6 +61,12 @@ def slidingWindowInt(x, dim, Tau, dT, duration = 3, mono = True):
             X[i, :] = x[idxx][:,0]
     return X
 
+def get_all_embeddings(X_arr, dim_arr, Tau_arr, dT_arr):
+    Y_arr = []
+    for i in range(len(X_arr)):
+        Y = slidingWindowInt(X_arr[i], dim_arr[i], Tau_arr[i], dT_arr[i])
+        Y_arr = Y_arr.append(Y)
+    return Y
 
 def compute_novfn(X, winSize, hopSize, plot_spectrogram = False, plot_novfn = False):
     #Compute the power spectrogram and audio novelty function
@@ -93,7 +99,7 @@ def compute_novfn(X, winSize, hopSize, plot_spectrogram = False, plot_novfn = Fa
 def compute_all_novfn(X_arr, winSizes, hopSizes):
     S_arr = []
     novFn_arr = []
-    for i in len(X_arr):
+    for i in range(len(X_arr)):
         X = X_arr[i]
         winSize = winSizes[i]
         hopSize = hopSizes[i]
@@ -102,6 +108,15 @@ def compute_all_novfn(X_arr, winSizes, hopSizes):
         novFn_arr = novFn_arr.append(novFn)
     return S_arr, novFn_arr
 
+def compute_chroma(X, Fs):
+    chroma = librosa.feature.chroma_stft(X[:,0], Fs)
+    return chroma
+
+def compute_all_chroma(X_arr, Fs_arr):
+    chroma_arr = []
+    for i in range(len(X_arr)):
+        chroma_arr = chroma_arr.append(compute_chroma(X_arr[i], Fs[i]))
+    return chroma_arr
 
 # Y is the data, dim is the MAX dimensional homology we want to compute
 def compute_pd(Y, dim = 1, plot_points = False, plot_dgm = True):
@@ -182,9 +197,11 @@ def compute_clusters(famemonster_dgms, artpop_dgms, chromatica_dgms, plot_cluste
     y_chromatica = y[famemonster_length + artpop_length:famemonster_length+artpop_length + chromatica_length]
     labels_third_album = cluster_labels[famemonster_length + artpop_length:famemonster_length+artpop_length + chromatica_length]
     
+    plt.figure()
     plt.scatter(x_famemonster, y_famemonster, c = labels_famemonster, marker = 'o')
     plt.scatter(x_artpop, y_artpop, c = labels_artpop, marker = 'x')
     plt.scatter(x_chromatica, y_chromatica, c = labels_third_album, marker = '+')
+    plt.show()
 
 
 ''' 
@@ -221,25 +238,32 @@ artpop_tempos = [129,121,110,113,136,138,97,117,127,124,116,101,128,133,139]
 chromatica_tempos = [75,123,117,123,117,117,75,117,121,120,117,123,121,122,123,117]
 
 
-
-S, novFn = compute_novfn(X,winSize, hopSize)
-
-
 # Step 3
 # Can replace with whatever you want, novelty functions or chroma features or whatever
 
 winSize = 512
 hopSize = 256
-famemonster_s, famemonster_novfns = compute_all_novfn(famemonster_waveforms, famemonster_winSizes, famemonster_hopSizes)
-artpop_s, artpop_novfns = compute_all_novfn(artpop_waveforms, artpop_winSizes, artpop_hopSizes)
-chromatica_s, chromatica_novfns = compute_all_novfn(chromatica_waveforms, chromatica_winSizes, chromatica_hopSizes)
+winSizes = np.full((len()))
+famemonster_s, famemonster_novfns = compute_all_novfn(famemonster_waveforms, np.full((len(famemonster_novfns),1), winSize), np.full((len(famemonster_novfns),1), hopSize))
+artpop_s, artpop_novfns = compute_all_novfn(artpop_waveforms, np.full((len(artpop_novfns),1), winSize), np.full((len(artpop_novfns),1), hopSize))
+chromatica_s, chromatica_novfns = compute_all_novfn(chromatica_waveforms, np.full((len(chromatica_novfns),1), winSize), np.full((len(chromatica_novfns),1), hopSize))
+
+dim = 20
+Tau = (Fs/2)/(float(hopSize)*dim)  
+dT = 1
+Y = getSlidingWindowInteger(novFn, dim, Tau, dT)
+
+famemonster_embeddings = get_all_embeddings(famemonster_novfns, , , )
+artpop_embeddings = get_all_embeddings(artpop_novfns, , , )
+chromatica_embeddings = get_all_embeddings(chromatica_novfns, , ,)
+
 
 # Step 4
 
 # Y is the sliding window embedding
-famemonster_pds = compute_all_pds(famemonster_novfns)
-artpop_pds = compute_all_pds(artpop_novfns)
-chromatica_pds = compute_all_pds(chromatica_novfns)
+famemonster_pds = compute_all_pds(famemonster_embeddings)
+artpop_pds = compute_all_pds(artpop_embeddings)
+chromatica_pds = compute_all_pds(chromatica_embeddings)
 
 
 # Step 5
@@ -260,33 +284,13 @@ dim = 20
 Tau = (Fs)/(float(hopSize)*dim)
 dT = 1
 
-Y = slidingWindowInt(novFn, dim, Tau, dT)
-print("Y.shape = ", Y.shape)
-
-print("Sample rate"+str(Fs))
-chroma = librosa.feature.chroma_stft(X[:,0], Fs)
-
-
-print("Chroma shape: "+str(chroma.shape))
-dim = 5
-Tau = 1
-dT = 3
-Y_chroma = slidingWindowInt(chroma[3,0:200].transpose(), dim, Tau, dT)
-print("Y_chroma.shape= ", Y_chroma.shape)
-compute_pd(Y_chroma)
-
-
-
-
-
-
-
-
 
 
 ''' 
 Random Old Code 
 
+Y = slidingWindowInt(novFn, dim, Tau, dT)
+print("Y.shape = ", Y.shape)
 
 #dim*Tau here spans 1/2 second since Fs is the sample rate
 Original settings 
@@ -321,4 +325,17 @@ librosa.display.specshow(chroma, y_axis='chroma', x_axis='time')
 plt.colorbar()
 plt.title('Chromagram')
 plt.tight_layout()
+
+print("Sample rate"+str(Fs))
+chroma = librosa.feature.chroma_stft(X[:,0], Fs)
+
+
+print("Chroma shape: "+str(chroma.shape))
+dim = 5
+Tau = 1
+dT = 3
+Y_chroma = slidingWindowInt(chroma[3,0:200].transpose(), dim, Tau, dT)
+print("Y_chroma.shape= ", Y_chroma.shape)
+compute_pd(Y_chroma)
+
 '''
