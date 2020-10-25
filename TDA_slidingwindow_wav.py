@@ -20,6 +20,7 @@ from IPython.display import Audio
 from MusicFeatures import *
 import librosa
 import librosa.display
+from pathlib import Path
 
 def get_waveform(file_name, should_plot = False):
     #load in song and display it as waveform
@@ -219,10 +220,33 @@ Repeat for each album
 5. Concatenate all lists of persistence diagrams, compute the clusters
 '''
 
+''' This is the potential fix to filepath issues, but is not working at the moment
+path = Path(__file__).parent
+scipy.io.wavfile.read((path / '../FameMonster/01 - Bad Romance [Explicit]').resolve())
+'''
 # Step 1
-famemonster_filepaths = []
-artpop_filepaths = []
-chromatica_filepaths = []
+famemonster_filepaths = ['01 - Bad Romance [Explicit]', '02 - Alejandro', '03 - Monster [Explicit]', 
+'04 - Speechless', '05 -Dance In The Dark [Explicit]', '06 - Telephone [feat. Beyonce]', '07 - So Happy I Could Die', 
+'08 - Teeth [Explicit]', "(Disc 2) 01 - Just Dance [feat. Colby O'Donis]", '(Disc 2) 02 - LoveGame', 
+'(Disc 2) 04 - Poker Face', '(Disc 2) 07 - The Fame', '(Disc 2) 09 - Starstruck [feat. Space Cowboy _ Flo Rida]'
+'(Disc 2) 11 - Paper Gangsta [Explicit]', '(Disc 2) 12 - Brown Eyes', '(Disc 2) 13 - I Like It Rough',
+'(Disc 2) 14 - Summerboy', '(Disc 2) 15 - Disco Heaven']
+for i in range(len(famemonster_filepaths)):
+    famemonster_filepaths[i] = "../FameMonster/" + famemonster_filepaths[i]
+
+artpop_filepaths = ['01 - Aura [Explicit]', '02 - Venus [Explicit]', '03 - G.U.Y. [Explicit]', '04 - Sexxx Dreams [Explicit]', 
+'05 - Jewels N_ Drugs [feat. T.I. _ Too $hort _ Twista] [Explicit]', '06 - MANiCURE', '07 - ARTPOP',
+'08 - Swine [Explicit]', '09 - Donatella [Explicit]', '10 - Fashion!', '11 - Mary Jane Holland [Explicit]'
+'12 - Dope [Explicit]', '13 - Gypsy', '14 - Applause']
+for i in range(len(artpop_filepaths)):
+    artpop_filepaths[i] = "../Artpop/" + artpop_filepaths[i]
+
+chromatica_filepaths = ['01 Chromatica I', '02 Alice', '03 Stupid Love', '04 Rain On Me', '05 Free Woman',
+'06 Fun Tonight', '07 Chromatica II', '08 911', '09 Plastic Doll', '10 Sour Candy', '11 Enigma', '12 Replay',
+'13 Chromatica III', '14 Sine From Above', '15 1000 Doves', '16 Babylon']
+for i in range(len(chromatica_filepaths)):
+    chromatica_filepaths[i] = "../Chromatica/" + chromatica_filepaths[i]
+
 
 famemonster_sample_rates, famemonster_waveforms = get_all_waveforms(famemonster_filepaths)
 artpop_sample_rates, artpop_waveforms = get_all_waveforms(artpop_filepaths)
@@ -253,9 +277,9 @@ Tau = (Fs/2)/(float(hopSize)*dim)
 dT = 1
 Y = getSlidingWindowInteger(novFn, dim, Tau, dT)
 
-famemonster_embeddings = get_all_embeddings(famemonster_novfns, , , )
-artpop_embeddings = get_all_embeddings(artpop_novfns, , , )
-chromatica_embeddings = get_all_embeddings(chromatica_novfns, , ,)
+#famemonster_embeddings = get_all_embeddings(famemonster_novfns, , , )
+#artpop_embeddings = get_all_embeddings(artpop_novfns, , , )
+#chromatica_embeddings = get_all_embeddings(chromatica_novfns, , ,)
 
 
 # Step 4
