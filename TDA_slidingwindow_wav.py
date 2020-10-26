@@ -38,9 +38,10 @@ def get_all_waveforms(filepaths):
     sampling_rates = []
     waveforms = []
     for path in filepaths:
+        print(path)
         Fs, X = get_waveform(path)
-        sampling_rates = sampling_rates.append(Fs)
-        waveforms = waveforms.append(X)
+        sampling_rates.append(Fs)
+        waveforms.append(X)
     return sampling_rates, waveforms
 
 #sliding window, assuming integer x, dim, Tau
@@ -66,11 +67,14 @@ def get_all_embeddings(X_arr, dim_arr, Tau_arr, dT_arr):
     Y_arr = []
     for i in range(len(X_arr)):
         Y = slidingWindowInt(X_arr[i], dim_arr[i], Tau_arr[i], dT_arr[i])
-        Y_arr = Y_arr.append(Y)
+        Y_arr.append(Y)
     return Y
 
-def compute_novfn(X, winSize, hopSize, plot_spectrogram = False, plot_novfn = False):
+def compute_novfn(X, Fs, winSize, hopSize, plot_spectrogram = False, plot_novfn = False):
     #Compute the power spectrogram and audio novelty function
+    print(winSize)
+    print(type(winSize))
+    print(hopSize)
     (S, novFn) = getAudioNoveltyFn(X[:,0], Fs, winSize, hopSize)
         
     if plot_spectrogram:    
@@ -97,16 +101,17 @@ def compute_novfn(X, winSize, hopSize, plot_spectrogram = False, plot_novfn = Fa
 
     return S,novFn
 
-def compute_all_novfn(X_arr, winSizes, hopSizes):
+def compute_all_novfn(X_arr, Fs_arr, winSizes, hopSizes):
     S_arr = []
     novFn_arr = []
     for i in range(len(X_arr)):
         X = X_arr[i]
-        winSize = winSizes[i]
-        hopSize = hopSizes[i]
-        S, novFn = compute_novfn(X, winSize, hopSize)
-        S_arr = S_arr.append(S)
-        novFn_arr = novFn_arr.append(novFn)
+        Fs = Fs_arr[i]
+        winSize = winSizes[i][0]
+        hopSize = hopSizes[i][0]
+        S, novFn = compute_novfn(X, Fs, winSize, hopSize)
+        S_arr.append(S)
+        novFn_arr.append(novFn)
     return S_arr, novFn_arr
 
 def compute_chroma(X, Fs):
@@ -116,7 +121,7 @@ def compute_chroma(X, Fs):
 def compute_all_chroma(X_arr, Fs_arr):
     chroma_arr = []
     for i in range(len(X_arr)):
-        chroma_arr = chroma_arr.append(compute_chroma(X_arr[i], Fs[i]))
+        chroma_arr.append(compute_chroma(X_arr[i], Fs[i]))
     return chroma_arr
 
 # Y is the data, dim is the MAX dimensional homology we want to compute
@@ -150,7 +155,7 @@ def compute_all_pds(Y_arr, dim = 1):
     dgms = []
     for Y in Y_arr:
         PDs = compute_pd(Y, dim, plot_points = False, plot_dgm = False)
-        dgms = dgms.append(PDs[dim])
+        dgms.append(PDs[dim])
     return dgms
 
 # Compute and visualize clusters given list of diagrams
@@ -220,37 +225,46 @@ Repeat for each album
 5. Concatenate all lists of persistence diagrams, compute the clusters
 '''
 
-''' This is the potential fix to filepath issues, but is not working at the moment
+''' This is the potential fix to filepath issues, but is not working at the moment'''
 path = Path(__file__).parent
-scipy.io.wavfile.read((path / '../FameMonster/01 - Bad Romance [Explicit]').resolve())
-'''
+
 # Step 1
+
+'''
 famemonster_filepaths = ['01 - Bad Romance [Explicit]', '02 - Alejandro', '03 - Monster [Explicit]', 
-'04 - Speechless', '05 -Dance In The Dark [Explicit]', '06 - Telephone [feat. Beyonce]', '07 - So Happy I Could Die', 
+'04 - Speechless', '05 - Dance In The Dark [Explicit]', '06 - Telephone [feat. Beyoncé]', '07 - So Happy I Could Die', 
 '08 - Teeth [Explicit]', "(Disc 2) 01 - Just Dance [feat. Colby O'Donis]", '(Disc 2) 02 - LoveGame', 
 '(Disc 2) 04 - Poker Face', '(Disc 2) 07 - The Fame', '(Disc 2) 09 - Starstruck [feat. Space Cowboy _ Flo Rida]'
 '(Disc 2) 11 - Paper Gangsta [Explicit]', '(Disc 2) 12 - Brown Eyes', '(Disc 2) 13 - I Like It Rough',
 '(Disc 2) 14 - Summerboy', '(Disc 2) 15 - Disco Heaven']
+'''
+
+famemonster_filepaths = ['01 - Bad Romance [Explicit]', '02 - Alejandro', '03 - Monster [Explicit]', 
+'04 - Speechless', '05 - Dance In The Dark [Explicit]']
+
 for i in range(len(famemonster_filepaths)):
-    famemonster_filepaths[i] = "../FameMonster/" + famemonster_filepaths[i]
+    famemonster_filepaths[i] = famemonster_filepaths[i] + ".wav"
+    famemonster_filepaths[i] = (path / '../FameMonster' / famemonster_filepaths[i]).resolve() 
 
 artpop_filepaths = ['01 - Aura [Explicit]', '02 - Venus [Explicit]', '03 - G.U.Y. [Explicit]', '04 - Sexxx Dreams [Explicit]', 
 '05 - Jewels N_ Drugs [feat. T.I. _ Too $hort _ Twista] [Explicit]', '06 - MANiCURE', '07 - ARTPOP',
 '08 - Swine [Explicit]', '09 - Donatella [Explicit]', '10 - Fashion!', '11 - Mary Jane Holland [Explicit]'
 '12 - Dope [Explicit]', '13 - Gypsy', '14 - Applause']
 for i in range(len(artpop_filepaths)):
-    artpop_filepaths[i] = "../Artpop/" + artpop_filepaths[i]
-
+    artpop_filepaths[i] = artpop_filepaths[i] + '.wav'
+    artpop_filepaths[i] = (path / '../Artpop' / artpop_filepaths[i]).resolve() 
+    
 chromatica_filepaths = ['01 Chromatica I', '02 Alice', '03 Stupid Love', '04 Rain On Me', '05 Free Woman',
 '06 Fun Tonight', '07 Chromatica II', '08 911', '09 Plastic Doll', '10 Sour Candy', '11 Enigma', '12 Replay',
 '13 Chromatica III', '14 Sine From Above', '15 1000 Doves', '16 Babylon']
 for i in range(len(chromatica_filepaths)):
-    chromatica_filepaths[i] = "../Chromatica/" + chromatica_filepaths[i]
+    chromatica_filepaths[i] = chromatica_filepaths[i] + '.wav'
+    chromatica_filepaths[i] = (path / '../Chromatica' / chromatica_filepaths[i]).resolve() 
 
 
 famemonster_sample_rates, famemonster_waveforms = get_all_waveforms(famemonster_filepaths)
-artpop_sample_rates, artpop_waveforms = get_all_waveforms(artpop_filepaths)
-chromatica_sample_rates, chromatica_waveforms = get_all_waveforms(chromatica_filepaths)
+#artpop_sample_rates, artpop_waveforms = get_all_waveforms(artpop_filepaths)
+#chromatica_sample_rates, chromatica_waveforms = get_all_waveforms(chromatica_filepaths)
 
 
 # Step 2
@@ -261,16 +275,15 @@ famemonster_tempos = [117,98,119,144,120,122,99,96]
 artpop_tempos = [129,121,110,113,136,138,97,117,127,124,116,101,128,133,139]
 chromatica_tempos = [75,123,117,123,117,117,75,117,121,120,117,123,121,122,123,117]
 
+winSize = 512
+hopSize = 256
 
 # Step 3
 # Can replace with whatever you want, novelty functions or chroma features or whatever
 
-winSize = 512
-hopSize = 256
-winSizes = np.full((len()))
-famemonster_s, famemonster_novfns = compute_all_novfn(famemonster_waveforms, np.full((len(famemonster_novfns),1), winSize), np.full((len(famemonster_novfns),1), hopSize))
-artpop_s, artpop_novfns = compute_all_novfn(artpop_waveforms, np.full((len(artpop_novfns),1), winSize), np.full((len(artpop_novfns),1), hopSize))
-chromatica_s, chromatica_novfns = compute_all_novfn(chromatica_waveforms, np.full((len(chromatica_novfns),1), winSize), np.full((len(chromatica_novfns),1), hopSize))
+famemonster_s, famemonster_novfns = compute_all_novfn(famemonster_waveforms, famemonster_sample_rates, np.full((len(famemonster_waveforms),1), winSize), np.full((len(famemonster_waveforms),1), hopSize))
+#artpop_s, artpop_novfns = compute_all_novfn(artpop_waveforms, artpop_sample_rates, np.full((len(artpop_waveforms),1), winSize), np.full((len(artpop_waveforms),1), hopSize))
+#chromatica_s, chromatica_novfns = compute_all_novfn(chromatica_waveforms, chromatica_sample_rates, np.full((len(chromatica_waveforms),1), winSize), np.full((len(chromatica_waveforms),1), hopSize))
 
 dim = 20
 Tau = (Fs/2)/(float(hopSize)*dim)  
@@ -295,6 +308,14 @@ chromatica_pds = compute_all_pds(chromatica_embeddings)
 compute_clusters(famemonster_pds, artpop_pds, chromatica_pds)
 
 
+
+
+
+''' 
+Random Old Code 
+
+
+
 #Take the first 3 seconds of the novelty function
 fac = int(Fs/hopSize)
 novFn = novFn[fac*4:fac*20]
@@ -308,10 +329,6 @@ dim = 20
 Tau = (Fs)/(float(hopSize)*dim)
 dT = 1
 
-
-
-''' 
-Random Old Code 
 
 Y = slidingWindowInt(novFn, dim, Tau, dT)
 print("Y.shape = ", Y.shape)
