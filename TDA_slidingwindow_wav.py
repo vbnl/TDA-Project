@@ -20,7 +20,9 @@ from IPython.display import Audio
 from MusicFeatures import *
 import librosa
 import librosa.display
-from pathlib import Path
+import os
+import pickle
+import gc
 
 def get_waveform(file_name, should_plot = False):
     #load in song and display it as waveform
@@ -67,14 +69,12 @@ def get_all_embeddings(X_arr, dim_arr, Tau_arr, dT_arr):
     Y_arr = []
     for i in range(len(X_arr)):
         Y = slidingWindowInt(X_arr[i], dim_arr[i], Tau_arr[i], dT_arr[i])
+        print(Y)
         Y_arr.append(Y)
     return Y
 
 def compute_novfn(X, Fs, winSize, hopSize, plot_spectrogram = False, plot_novfn = False):
     #Compute the power spectrogram and audio novelty function
-    print(winSize)
-    print(type(winSize))
-    print(hopSize)
     (S, novFn) = getAudioNoveltyFn(X[:,0], Fs, winSize, hopSize)
         
     if plot_spectrogram:    
@@ -122,10 +122,10 @@ def compute_all_chroma(X_arr, Fs_arr):
     chroma_arr = []
     for i in range(len(X_arr)):
         chroma_arr.append(compute_chroma(X_arr[i], Fs[i]))
-    return chroma_arr
+    return chroma_arr 
 
 # Y is the data, dim is the MAX dimensional homology we want to compute
-def compute_pd(Y, dim = 1, plot_points = False, plot_dgm = True):
+def compute_pd(Y, dim = 1, plot_points = True, plot_dgm = True):
     # Mean-center and normalize
     Y = Y - np.mean(Y, 1)[:, None]
     Y = Y/np.sqrt(np.sum(Y**2, 1))[:, None]
@@ -144,7 +144,8 @@ def compute_pd(Y, dim = 1, plot_points = False, plot_dgm = True):
     if(plot_dgm):
         plt.subplot(122)
         plot_diagrams(PDs)
-        plt.title("Persistence Diagram, dim = "+str(dim)+" tau = "+str(Tau) + "dT" + str(dT))
+        # Below line doesn't work since I refactored code
+        #plt.title("Persistence Diagram, dim = "+str(dim)+" tau = "+str(Tau) + "dT" + str(dT))
     if(plot_points or plot_dgm):
         plt.show()
 
@@ -157,6 +158,66 @@ def compute_all_pds(Y_arr, dim = 1):
         PDs = compute_pd(Y, dim, plot_points = False, plot_dgm = False)
         dgms.append(PDs[dim])
     return dgms
+
+# Starts from scratch
+# Compute persistence diagrams corresponding to one song (one for each segment)
+def compute_pds_for_specific_song_split(X, Fs, song_name, splits, split_num, tempo, dim = 20, dT = 2, store = True):
+    if split_num == 0:
+            start_point = 0
+    else:
+        print(splits)
+        start_point = Fs*splits[split_num-1]
+    if split_num == len(splits)+1:
+        end_point = len(X)
+    else:
+        end_point = Fs*splits[split_num]
+    
+    windowSize = 512
+    hopSize = 256
+    
+    # Compute novelty function
+    S, novFn = compute_novfn(X[start_point:end_point], Fs, windowSize, hopSize)
+
+    Tau = Fs * 120 /(hopSize * dim * tempo)
+    Y = slidingWindowInt(novFn, dim, Tau, dT)
+
+    dgms = compute_pd(Y)
+    
+    # Store pickle of matrix for persistence diagram
+    if(store):
+        savepath = song_name + "_" + str(start_point) + "_"  + str(end_point)
+        outfile = open(savepath, "wb")
+        pickle.dump(dgms, outfile)
+        outfile.close()
+    return dgms 
+
+# Input splits as timestamps
+def compute_pds_for_full_song(X, Fs, song_name, splits, tempo, dim = 20, dT = 2, store = True):
+    all_dgms = []
+    for i in range(len(splits)+1):
+        dgms = compute_pds_for_specific_song_split(X,Fs, song_name, splits, i, tempo, dim, dT, store)  
+        all_dgms.append(dgms)
+            
+    return all_dgms
+
+# segments should be fed in as arrays of arrays of size two consisting of start and end point
+# Start and end point should be fed in as array indices
+def compute_pds_from_filepath(song_name, song_filepath, splits, tempo, dim = 20, dT = 2, store = True):
+    # Get waveform
+    Fs, waveform = get_waveform(song_filepath)
+    
+    all_dgms = compute_pds_for_full_song(waveform, Fs, song_name, splits, tempo, dim, dT, store)
+        
+    return all_dgms
+
+def compute_pds_for_split_from_filepath(song_name, song_filepath, splits, i, tempo, dim = 20, dT = 2, store = True):
+    Fs, waveform = get_waveform(song_filepath)
+
+    dgm = compute_pds_for_specific_song_split(waveform, Fs, song_name, splits, i, tempo, dim, dT, store)
+
+    return dgm
+
+# Not tested yet
 
 # Compute and visualize clusters given list of diagrams
 def compute_clusters(famemonster_dgms, artpop_dgms, chromatica_dgms, plot_clusters = True):
@@ -211,27 +272,26 @@ def compute_clusters(famemonster_dgms, artpop_dgms, chromatica_dgms, plot_cluste
 
 
 ''' 
-Basic Workflow:
 
-For any given album...
+For each song or song snippet
+1. Compute waveform and sampling rate
+2. Compute window size and hop size
+3. Compute novelty function
+4. Compute persistence diagram
+5. Store persistence diagram
+6. Clear data
 
-1. Compute all waveforms and sampling rates
-2. Compute all window sizes and hop sizes
-3. Compute novelty functions (or chroma features, or etc) 
-4. Compute persistence diagrams
+Then finally,
 
-Repeat for each album
-
-5. Concatenate all lists of persistence diagrams, compute the clusters
+7. Compute the clusters
 '''
 
-''' This is the potential fix to filepath issues, but is not working at the moment'''
-path = Path(__file__).parent
+path = os.path.abspath("Lady Gaga - Shape Features.ipynb")
+path = os.path.dirname(path)
 
-# Step 1
 
 '''
-famemonster_filepaths = ['01 - Bad Romance [Explicit]', '02 - Alejandro', '03 - Monster [Explicit]', 
+famemonster_songs = ['01 - Bad Romance [Explicit]', '02 - Alejandro', '03 - Monster [Explicit]', 
 '04 - Speechless', '05 - Dance In The Dark [Explicit]', '06 - Telephone [feat. Beyoncé]', '07 - So Happy I Could Die', 
 '08 - Teeth [Explicit]', "(Disc 2) 01 - Just Dance [feat. Colby O'Donis]", '(Disc 2) 02 - LoveGame', 
 '(Disc 2) 04 - Poker Face', '(Disc 2) 07 - The Fame', '(Disc 2) 09 - Starstruck [feat. Space Cowboy _ Flo Rida]'
@@ -239,32 +299,35 @@ famemonster_filepaths = ['01 - Bad Romance [Explicit]', '02 - Alejandro', '03 - 
 '(Disc 2) 14 - Summerboy', '(Disc 2) 15 - Disco Heaven']
 '''
 
-famemonster_filepaths = ['01 - Bad Romance [Explicit]', '02 - Alejandro', '03 - Monster [Explicit]', 
-'04 - Speechless', '05 - Dance In The Dark [Explicit]']
+famemonster_filepaths = ['01 - Bad Romance [Explicit]']
 
 for i in range(len(famemonster_filepaths)):
-    famemonster_filepaths[i] = famemonster_filepaths[i] + ".wav"
-    famemonster_filepaths[i] = (path / '../FameMonster' / famemonster_filepaths[i]).resolve() 
-
+    famemonster_filepaths[i] = path + '\\..\\FameMonster\\' + famemonster_filepaths[i] + ".wav" 
+'''
 artpop_filepaths = ['01 - Aura [Explicit]', '02 - Venus [Explicit]', '03 - G.U.Y. [Explicit]', '04 - Sexxx Dreams [Explicit]', 
 '05 - Jewels N_ Drugs [feat. T.I. _ Too $hort _ Twista] [Explicit]', '06 - MANiCURE', '07 - ARTPOP',
 '08 - Swine [Explicit]', '09 - Donatella [Explicit]', '10 - Fashion!', '11 - Mary Jane Holland [Explicit]'
 '12 - Dope [Explicit]', '13 - Gypsy', '14 - Applause']
+'''
+artpop_filepaths = ['14 - Applause']
 for i in range(len(artpop_filepaths)):
-    artpop_filepaths[i] = artpop_filepaths[i] + '.wav'
-    artpop_filepaths[i] = (path / '../Artpop' / artpop_filepaths[i]).resolve() 
+    artpop_filepaths[i] = path + '\\..\\Artpop\\' + artpop_filepaths[i] + ".wav" 
     
 chromatica_filepaths = ['01 Chromatica I', '02 Alice', '03 Stupid Love', '04 Rain On Me', '05 Free Woman',
 '06 Fun Tonight', '07 Chromatica II', '08 911', '09 Plastic Doll', '10 Sour Candy', '11 Enigma', '12 Replay',
 '13 Chromatica III', '14 Sine From Above', '15 1000 Doves', '16 Babylon']
 for i in range(len(chromatica_filepaths)):
-    chromatica_filepaths[i] = chromatica_filepaths[i] + '.wav'
-    chromatica_filepaths[i] = (path / '../Chromatica' / chromatica_filepaths[i]).resolve() 
+    chromatica_filepaths[i] = path + '\\..\\Chromatica\\' + chromatica_filepaths[i] + ".wav" 
 
+# An array of arrays, where subarray corresponds to splits for a given song
+artpop_song_splits = [
+    # 14 - Applause
+    [15,35, 56,70,83,109,143,151,164,178, 208]]
 
-famemonster_sample_rates, famemonster_waveforms = get_all_waveforms(famemonster_filepaths)
+#famemonster_sample_rates, famemonster_waveforms = get_all_waveforms(famemonster_filepaths)
 #artpop_sample_rates, artpop_waveforms = get_all_waveforms(artpop_filepaths)
 #chromatica_sample_rates, chromatica_waveforms = get_all_waveforms(chromatica_filepaths)
+
 
 
 # Step 2
@@ -277,6 +340,15 @@ chromatica_tempos = [75,123,117,123,117,117,75,117,121,120,117,123,121,122,123,1
 
 winSize = 512
 hopSize = 256
+
+compute_pds_from_filepath("14 - Applause", artpop_filepaths[0], artpop_song_splits[0], artpop_tempos[13])
+
+compute_pds_for_split_from_filepath("14 - Applause", artpop_filepaths[0], artpop_song_splits[0], 3, artpop_tempos[13])
+
+
+
+''' 
+Random Old Code 
 
 # Step 3
 # Can replace with whatever you want, novelty functions or chroma features or whatever
@@ -306,13 +378,6 @@ chromatica_pds = compute_all_pds(chromatica_embeddings)
 # Step 5
 
 compute_clusters(famemonster_pds, artpop_pds, chromatica_pds)
-
-
-
-
-
-''' 
-Random Old Code 
 
 
 
