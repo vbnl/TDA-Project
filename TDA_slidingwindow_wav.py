@@ -131,7 +131,8 @@ def compute_pd(Y, dim = 1, plot_points = True, plot_dgm = True):
     Y = Y/np.sqrt(np.sum(Y**2, 1))[:, None]
     PDs = ripser(Y, dim)['dgms']
     pca = PCA()
-    Z = pca.fit_transform(Y)
+    Z2 = pca.fit_transform(Y)
+    Z = densityChecked(Z2)
 
     #print(pca.explained_variance_ratio_)
 
