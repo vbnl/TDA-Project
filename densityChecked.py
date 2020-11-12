@@ -8,20 +8,18 @@ Created on Thu Oct 29 16:26:17 2020
 import math
 
 
-def densityChecked(M) -> None:
+def densityChecked(M, r0 = 5, k=5) -> None:
     xlist = M[:,0]
     ylist = M[:,1]
     
     #EDIT AS NECESSARY
     #**********************************
     #radius parameter
-    r0 = 5
+    #r0 = 5
     #minimum number of points allowable
-    k = 5
+    #k = 5
     #**********************************
 
-    #counter for points within r0
-    count = 0
 
     #list of yes/no (1/0) for each point
     checklist = [0]*len(xlist)
@@ -29,6 +27,8 @@ def densityChecked(M) -> None:
     #checklist is now list of 1s and 0s with indices corresponding to xlist and ylist
     a=0;
     while a < len(xlist):
+        #counter for points within r0
+        count = 0
         b=0;
         while b < len(xlist):
             if a != b:
